@@ -40,8 +40,6 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- =========================================================
 -- USERS / SUBSCRIBERS / ADMIN
--- Matches current backend fields: accountName, accountNumber, ccaNumber, address, phone, role
--- password_hash is nullable for future security upgrade; current code does not require it yet.
 -- =========================================================
 CREATE TABLE `users` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -50,6 +48,7 @@ CREATE TABLE `users` (
   `ccaNumber` VARCHAR(50) NOT NULL,
   `address` VARCHAR(255) NOT NULL,
   `phone` VARCHAR(30) NOT NULL,
+  `location` ENUM('Balayan','Calaca','Lian','Calatagan','Nasugbu','Lemery') NOT NULL DEFAULT 'Balayan',
   `email` VARCHAR(150) DEFAULT NULL,
   `password_hash` VARCHAR(255) DEFAULT NULL,
   `role` ENUM('user','admin') NOT NULL DEFAULT 'user',
@@ -60,12 +59,12 @@ CREATE TABLE `users` (
   UNIQUE KEY `idx_users_accountNumber` (`accountNumber`),
   UNIQUE KEY `idx_users_ccaNumber` (`ccaNumber`),
   KEY `idx_users_role` (`role`),
-  KEY `idx_users_status` (`status`)
+  KEY `idx_users_status` (`status`),
+  KEY `idx_users_location` (`location`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
 -- PREPAID PLANS / POS MODULE
--- Used by future /api/prepaid-pos/plans and loadService.js
 -- =========================================================
 CREATE TABLE `prepaid_plans` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -135,8 +134,7 @@ CREATE TABLE `prepaid_transactions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
--- REMOTE PREPAID LOAD REQUESTS / FIGMA WORKFLOW
--- Used by /api/load-requests
+-- REMOTE PREPAID LOAD REQUESTS
 -- =========================================================
 CREATE TABLE `load_requests` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -164,7 +162,6 @@ CREATE TABLE `load_requests` (
   CONSTRAINT `fk_load_requests_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Old/simple load history used by /api/load and admin transaction pages
 CREATE TABLE `load_history` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `user_id` INT(11) DEFAULT NULL,
@@ -181,8 +178,7 @@ CREATE TABLE `load_history` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
--- TICKETS / SUBSCRIBER CONCERNS / CHAT MESSAGES
--- Used by /api/tickets
+-- TICKETS / SUPPORT
 -- =========================================================
 CREATE TABLE `tickets` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -221,7 +217,6 @@ CREATE TABLE `ticket_messages` (
 
 -- =========================================================
 -- TECHNICIAN / REPAIR REQUESTS
--- Used by /api/technicians and future service workflow
 -- =========================================================
 CREATE TABLE `technician_requests` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -245,16 +240,14 @@ CREATE TABLE `technician_requests` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
--- TROUBLESHOOTING KNOWLEDGE / AI-ASSISTED SUPPORT BASE
--- Used by /api/troubleshoot
+-- TROUBLESHOOTING KNOWLEDGE BASE
 -- =========================================================
 CREATE TABLE `troubleshoot_models` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
   `name` VARCHAR(100) NOT NULL,
   `description` VARCHAR(255) DEFAULT NULL,
   `status` ENUM('active','inactive') NOT NULL DEFAULT 'active',
-  PRIMARY KEY (`id`),
-  KEY `idx_troubleshoot_models_status` (`status`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE `troubleshoot_issues` (
@@ -267,7 +260,6 @@ CREATE TABLE `troubleshoot_issues` (
   `suggested_tag` VARCHAR(100) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_troubleshoot_issues_model` (`model_id`),
-  KEY `idx_troubleshoot_issues_category` (`category`),
   CONSTRAINT `fk_troubleshoot_issue_model` FOREIGN KEY (`model_id`) REFERENCES `troubleshoot_models` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -283,7 +275,6 @@ CREATE TABLE `troubleshoot_steps` (
 
 -- =========================================================
 -- NOTIFICATIONS
--- Used by /api/notifications after route is mounted/fixed
 -- =========================================================
 CREATE TABLE `notifications` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -296,14 +287,11 @@ CREATE TABLE `notifications` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_notifications_user` (`user_id`),
-  KEY `idx_notifications_account` (`account_number`),
-  KEY `idx_notifications_read` (`is_read`),
   CONSTRAINT `fk_notifications_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
--- VALIDATION LOGS / AI VALIDATION
--- Used by /api/validation-log
+-- VALIDATION LOGS
 -- =========================================================
 CREATE TABLE `validation_logs` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -311,15 +299,11 @@ CREATE TABLE `validation_logs` (
   `input_value` VARCHAR(255) NOT NULL,
   `reason` VARCHAR(255) NOT NULL,
   `timestamp` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  KEY `idx_validation_logs_field` (`field`),
-  KEY `idx_validation_logs_timestamp` (`timestamp`)
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
--- EXCEL IMPORT / ARCHIVING / SERVICE HISTORY
--- Future-ready tables from manuscript requirements.
--- Current backend can ignore these until routes are added.
+-- IMPORT / ARCHIVE / SERVICE HISTORY
 -- =========================================================
 CREATE TABLE `import_batches` (
   `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -331,7 +315,6 @@ CREATE TABLE `import_batches` (
   `uploaded_by` INT(11) DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_import_uploaded_by` (`uploaded_by`),
   CONSTRAINT `fk_import_uploaded_by` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -344,8 +327,6 @@ CREATE TABLE `archive_records` (
   `archived_by` INT(11) DEFAULT NULL,
   `archived_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_archive_source` (`source_table`, `source_id`),
-  KEY `idx_archive_by` (`archived_by`),
   CONSTRAINT `fk_archive_by` FOREIGN KEY (`archived_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -360,37 +341,36 @@ CREATE TABLE `service_history` (
   `created_by` INT(11) DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_service_history_user` (`user_id`),
-  KEY `idx_service_history_account` (`account_number`),
-  KEY `idx_service_history_type` (`record_type`),
   CONSTRAINT `fk_service_history_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_service_history_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =========================================================
 -- SEED DATA
--- Login examples:
--- Admin: accountName = admin, accountId = admin
--- User:  accountName = loyd descallar, accountId = 88773322
 -- =========================================================
 INSERT INTO `users`
-  (`id`, `accountName`, `accountNumber`, `ccaNumber`, `address`, `phone`, `email`, `role`, `status`)
+  (`id`, `accountName`, `accountNumber`, `ccaNumber`, `address`, `phone`, `location`, `email`, `role`, `status`)
 VALUES
-  (1, 'admin', 'admin', '0', 'Descallar Satellite Services HQ, Balayan, Batangas', '09170000000', NULL, 'admin', 'active'),
-  (2, 'loyd descallar', '88773322', '88773322', 'Balayan, Batangas', '09755718056', NULL, 'user', 'active');
+  (1, 'admin', 'admin', '0', 'Descallar Satellite Services HQ, Balayan, Batangas', '09170000000', 'Balayan', NULL, 'admin', 'active'),
+  (2, 'loyd descallar', '88773322', '88773322', 'Balayan, Batangas', '09755718056', 'Balayan', NULL, 'user', 'active'),
+  (3, 'maria santos', '88001001', 'CCA-1001', 'Brgy. Lucban, Calaca, Batangas', '09181234567', 'Calaca', NULL, 'user', 'active'),
+  (4, 'jose reyes', '88002001', 'CCA-2001', 'Brgy. Lian Proper, Lian, Batangas', '09209876543', 'Lian', NULL, 'user', 'active'),
+  (5, 'ana garcia', '88003001', 'CCA-3001', 'Brgy. Calatagan Proper, Calatagan, Batangas', '09351112222', 'Calatagan', NULL, 'user', 'active'),
+  (6, 'pedro dela cruz', '88004001', 'CCA-4001', 'Brgy. Nasugbu Poblacion, Nasugbu, Batangas', '09473334444', 'Nasugbu', NULL, 'user', 'active'),
+  (7, 'rosa mendoza', '88005001', 'CCA-5001', 'Brgy. Lemery Proper, Lemery, Batangas', '09555556666', 'Lemery', NULL, 'user', 'active');
 
 INSERT INTO `prepaid_plans`
   (`id`, `plan_code`, `plan_name`, `amount`, `validity_days`, `hd_channels`, `sd_channels`, `benefits_text`, `ai_note`, `status`)
 VALUES
-  (1, 'REG100', 'Load 100', 100.00, 30, 2, 38, 'Entry regular load with basic channel access.', 'Best for light viewing and basic access.', 'active'),
-  (2, 'REG175', 'Load 175', 175.00, 30, 4, 45, 'Adds more channels than Load 100.', 'Good for customers who want a small upgrade.', 'active'),
-  (3, 'REG200', 'Load 200', 200.00, 30, 7, 62, 'Mid-entry package with more HD access.', 'Good for users who want more content without premium cost.', 'active'),
-  (4, 'REG300', 'Load 300', 300.00, 30, 10, 70, 'Broader channel access than lower loads.', 'Good value for frequent viewers.', 'active'),
-  (5, 'REG450', 'Load 450', 450.00, 30, 14, 78, 'Higher-tier regular load.', 'Good for users who want more variety.', 'active'),
-  (6, 'REG500', 'Load 500', 500.00, 30, 17, 82, 'Premium regular package.', 'Good for richer viewing experience.', 'active'),
-  (7, 'REG600', 'Load 600', 600.00, 30, 20, 86, 'High-tier regular load.', 'Good for heavier viewers.', 'active'),
-  (8, 'REG800', 'Load 800', 800.00, 30, 25, 91, 'High-value load with broader premium lineup.', 'Ideal for wide viewing selection.', 'active'),
-  (9, 'REG1000', 'Load 1000', 1000.00, 30, 30, 95, 'Top-tier prepaid load with broadest access.', 'Best for customers who want the broadest viewing experience.', 'active');
+  (1,  'REG100',  'Load 100',  100.00,  30, 2,  38, 'Entry regular load.',                  'Best for light viewing.',                   'active'),
+  (2,  'REG175',  'Load 175',  175.00,  30, 4,  45, 'Adds more channels than Load 100.',    'Good for small upgrade.',                   'active'),
+  (3,  'REG200',  'Load 200',  200.00,  30, 7,  62, 'Mid-entry package.',                   'Good for users wanting more content.',      'active'),
+  (4,  'REG300',  'Load 300',  300.00,  30, 10, 70, 'Broader channel access.',              'Good value for frequent viewers.',          'active'),
+  (5,  'REG450',  'Load 450',  450.00,  30, 14, 78, 'Higher-tier regular load.',            'Good for users wanting more variety.',      'active'),
+  (6,  'REG500',  'Load 500',  500.00,  30, 17, 82, 'Premium regular package.',             'Good for richer viewing experience.',       'active'),
+  (7,  'REG600',  'Load 600',  600.00,  30, 20, 86, 'High-tier regular load.',              'Good for heavier viewers.',                 'active'),
+  (8,  'REG800',  'Load 800',  800.00,  30, 25, 91, 'High-value load with premium lineup.', 'Ideal for wide viewing selection.',         'active'),
+  (9,  'REG1000', 'Load 1000', 1000.00, 30, 30, 95, 'Top-tier prepaid load.',              'Best for broadest viewing experience.',     'active');
 
 INSERT INTO `prepaid_accounts`
   (`id`, `user_id`, `account_number`, `account_name`, `current_plan_id`, `last_load_amount`, `last_load_date`, `expiry_date`, `status`)
@@ -410,10 +390,10 @@ INSERT INTO `troubleshoot_models` (`id`, `name`, `description`, `status`) VALUES
 INSERT INTO `troubleshoot_issues`
   (`id`, `model_id`, `title`, `description`, `category`, `error_code`, `suggested_tag`)
 VALUES
-  (1, 1, 'No signal on screen', 'TV shows no signal or blank screen', 'Technical Problem', 'NO_SIGNAL', 'Connection Issue'),
-  (2, 1, 'Remote not responding', 'Remote control does not work', 'Technical Problem', 'REMOTE', 'Device Issue'),
-  (3, 2, 'HD channels not displaying', 'Only SD channels are available', 'Channel Concern', 'HD_CHANNEL', 'Plan/Channel Issue'),
-  (4, 3, 'Recording not working', 'Cannot record scheduled programs', 'Device Concern', 'DVR_RECORD', 'Device Issue');
+  (1, 1, 'No signal on screen',       'TV shows no signal or blank screen',    'Technical Problem', 'NO_SIGNAL',  'Connection Issue'),
+  (2, 1, 'Remote not responding',     'Remote control does not work',          'Technical Problem', 'REMOTE',     'Device Issue'),
+  (3, 2, 'HD channels not displaying','Only SD channels are available',        'Channel Concern',   'HD_CHANNEL', 'Plan/Channel Issue'),
+  (4, 3, 'Recording not working',     'Cannot record scheduled programs',      'Device Concern',    'DVR_RECORD', 'Device Issue');
 
 INSERT INTO `troubleshoot_steps` (`id`, `issue_id`, `step_number`, `instruction`) VALUES
   (1, 1, 1, 'Check that the satellite cable is firmly connected to the box.'),
