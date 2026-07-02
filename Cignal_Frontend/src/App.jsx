@@ -22,11 +22,6 @@ import UserLoadRequest from "./pages/UserLoadRequest";
 import AdminLoadRequests from "./pages/AdminLoadRequests";
 import UserLoadHistory from "./pages/UserLoadHistory";
 
-
-
-
-
-
 export default function App() {
   return (
     <Routes>
@@ -43,16 +38,20 @@ export default function App() {
       <Route path="/user/retrieve-info" element={<UserRetrieveInfo />} />
       <Route path="/user/tickets" element={<UserTickets />} />
       <Route path="/user/chat/:ticketId" element={<UserChat />} />
+      <Route path="/user/load-request" element={<UserLoadRequest />} />
+      <Route path="/user/load-history" element={<UserLoadHistory />} />
 
-      {/* Admin Workspace */}
+      {/* Admin Workspace — all admin pages render inside the sidebar shell */}
       <Route path="/admin-dashboard" element={<AdminWorkspace />} />
       <Route path="/admin/customers" element={<AdminWorkspace />} />
+      <Route path="/admin/customers/:id" element={<AdminWorkspace />} />
       <Route path="/admin/plans" element={<AdminWorkspace />} />
       <Route path="/admin/tickets" element={<AdminWorkspace />} />
       <Route path="/admin/transactions" element={<AdminWorkspace />} />
       <Route path="/admin/analytics" element={<AdminWorkspace />} />
       <Route path="/admin/technicians" element={<AdminWorkspace />} />
       <Route path="/admin/pos" element={<AdminWorkspace />} />
+      <Route path="/admin/load-requests" element={<AdminWorkspace />} />
       <Route path="/admin/chat/:ticketId" element={<AdminChat />} />
 
       {/* Auth */}
@@ -62,9 +61,6 @@ export default function App() {
 
       {/* Default */}
       <Route path="/" element={<Navigate to="/login" replace />} />
-      <Route path="/user/load-request" element={<UserLoadRequest />} />
-      <Route path="/admin/load-requests" element={<AdminWorkspace />} />
-      <Route path="/user/load-history" element={<UserLoadHistory />} />
     </Routes>
   );
 }
