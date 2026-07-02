@@ -12,11 +12,15 @@ async function findById(id) {
   const [rows] = await pool.query(
     `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
             u.phone, u.location, u.email, u.role, u.status, u.created_at,
-            MAX(pt.transaction_date) as lastLoadDate
+            lx.last_load as lastLoadDate
      FROM users u
-     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     LEFT JOIN (
+       SELECT account_number, MAX(transaction_date) as last_load
+       FROM prepaid_transactions
+       WHERE status = 'completed'
+       GROUP BY account_number
+     ) lx ON lx.account_number = u.accountNumber
      WHERE u.id = ?
-     GROUP BY u.id
      LIMIT 1`,
     [id]
   );
@@ -56,11 +60,15 @@ async function findByAccountIdOrCca(accountId) {
   const [rows] = await pool.query(
     `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
             u.phone, u.location, u.role, u.status, u.created_at,
-            MAX(pt.transaction_date) as lastLoadDate
+            lx.last_load as lastLoadDate
      FROM users u
-     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     LEFT JOIN (
+       SELECT account_number, MAX(transaction_date) as last_load
+       FROM prepaid_transactions
+       WHERE status = 'completed'
+       GROUP BY account_number
+     ) lx ON lx.account_number = u.accountNumber
      WHERE u.accountNumber = ? OR u.ccaNumber = ?
-     GROUP BY u.id
      LIMIT 1`,
     [accountId, accountId]
   );
@@ -71,11 +79,15 @@ async function getAllUsers() {
   const [rows] = await pool.query(
     `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
             u.phone, u.location, u.role, u.status, u.created_at,
-            MAX(pt.transaction_date) as lastLoadDate
+            lx.last_load as lastLoadDate
      FROM users u
-     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     LEFT JOIN (
+       SELECT account_number, MAX(transaction_date) as last_load
+       FROM prepaid_transactions
+       WHERE status = 'completed'
+       GROUP BY account_number
+     ) lx ON lx.account_number = u.accountNumber
      WHERE u.role = 'user'
-     GROUP BY u.id
      ORDER BY u.created_at DESC, u.id DESC`
   );
   return rows;
@@ -84,17 +96,23 @@ async function getAllUsers() {
 async function getCustomerStats() {
   const now = new Date();
   const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   const [rows] = await pool.query(
     `SELECT
        COUNT(*) as total,
        SUM(CASE WHEN DATE_FORMAT(u.created_at, '%Y-%m') = ? THEN 1 ELSE 0 END) as thisMonth,
-       SUM(CASE WHEN MAX(pt.transaction_date) >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activeCount,
-       SUM(CASE WHEN MAX(pt.transaction_date) >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-                 AND MAX(pt.transaction_date) < DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as atRiskCount,
-       SUM(CASE WHEN MAX(pt.transaction_date) IS NULL
-                 OR MAX(pt.transaction_date) < DATE_SUB(NOW(), INTERVAL 60 DAY) THEN 1 ELSE 0 END) as inactiveCount
+       SUM(CASE WHEN lx.last_load >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activeCount,
+       SUM(CASE WHEN lx.last_load >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                 AND lx.last_load < DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as atRiskCount,
+       SUM(CASE WHEN lx.last_load IS NULL
+                 OR lx.last_load < DATE_SUB(NOW(), INTERVAL 60 DAY) THEN 1 ELSE 0 END) as inactiveCount
      FROM users u
-     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     LEFT JOIN (
+       SELECT account_number, MAX(transaction_date) as last_load
+       FROM prepaid_transactions
+       WHERE status = 'completed'
+       GROUP BY account_number
+     ) lx ON lx.account_number = u.accountNumber
      WHERE u.role = 'user'`,
     [thisMonth]
   );
