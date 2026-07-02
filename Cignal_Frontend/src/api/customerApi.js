@@ -2,6 +2,8 @@ import axiosClient from "./axiosClient";
 
 const customerApi = {
   getCustomers: () => axiosClient.get("/customers"),
+  getStats: () => axiosClient.get("/customers/stats"),
+  getCustomerById: (id) => axiosClient.get(`/customers/id/${id}`),
   getCustomerLookup: (accountId) => axiosClient.get(`/customers/${accountId}`),
   createCustomer: (data) => axiosClient.post("/customers", data),
   updateCustomer: (id, data) => axiosClient.put(`/customers/id/${id}`, data),
