@@ -1,15 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
+import { motion } from "motion/react";
 import { Search, X, Wrench, Calendar, Phone } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
 const STATUSES = ["Pending", "Scheduled", "Completed", "Cancelled"];
-
 const statusCfg = {
   Pending:   { badge: "bg-amber-100 text-amber-700",  dot: "bg-amber-400" },
   Scheduled: { badge: "bg-blue-100 text-blue-700",    dot: "bg-blue-500" },
   Completed: { badge: "bg-green-100 text-green-700",  dot: "bg-green-500" },
   Cancelled: { badge: "bg-slate-100 text-slate-600",  dot: "bg-slate-400" },
 };
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.08 } } };
+const fadeUp  = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: "easeOut" } } };
 
 export default function AdminTechnicianRequests() {
   const [requests, setRequests]   = useState([]);
@@ -24,11 +26,8 @@ export default function AdminTechnicianRequests() {
 
   const load = async () => {
     setLoading(true);
-    try {
-      const res = await axiosClient.get("/technicians/requests/admin");
-      setRequests(res.data?.requests || []);
-    } catch (err) { console.error("Tech requests load error", err); }
-    finally { setLoading(false); }
+    try { const res = await axiosClient.get("/technicians/requests/admin"); setRequests(res.data?.requests || []); }
+    catch (err) { console.error(err); } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
 
@@ -36,11 +35,7 @@ export default function AdminTechnicianRequests() {
     const q = search.toLowerCase();
     return requests
       .filter(r => statusFilter === "All" || r.status === statusFilter)
-      .filter(r =>
-        r.issueDescription?.toLowerCase().includes(q) ||
-        r.accountNumber?.toLowerCase().includes(q) ||
-        r.contactName?.toLowerCase().includes(q)
-      );
+      .filter(r => r.issueDescription?.toLowerCase().includes(q) || r.accountNumber?.toLowerCase().includes(q) || r.contactName?.toLowerCase().includes(q));
   }, [requests, search, statusFilter]);
 
   const kpis = [
@@ -50,81 +45,61 @@ export default function AdminTechnicianRequests() {
     { label: "Completed", value: requests.filter(r => r.status === "Completed").length, dot: "bg-green-500", color: "text-green-600" },
   ];
 
-  const openModal = (r) => {
-    setSelected(r);
-    setNewStatus(r.status);
-    setTechName(r.technician_name || "");
-    setAdminNote(r.admin_note || "");
-  };
+  const openModal = (r) => { setSelected(r); setNewStatus(r.status); setTechName(r.technician_name || ""); setAdminNote(r.admin_note || ""); };
 
   const handleSave = async () => {
     if (!selected) return;
     setSaving(true);
     try {
-      await axiosClient.patch(`/technicians/requests/admin/${selected.id}`, {
-        status: newStatus,
-        technician_name: techName || null,
-        admin_note: adminNote || null,
-      });
-      setRequests(prev => prev.map(r => r.id === selected.id
-        ? { ...r, status: newStatus, technician_name: techName, admin_note: adminNote } : r));
+      await axiosClient.patch(`/technicians/requests/admin/${selected.id}`, { status: newStatus, technician_name: techName || null, admin_note: adminNote || null });
+      setRequests(prev => prev.map(r => r.id === selected.id ? { ...r, status: newStatus, technician_name: techName, admin_note: adminNote } : r));
       setSelected(null);
-    } catch (err) { console.error("Tech update error", err); }
-    finally { setSaving(false); }
+    } catch (err) { console.error(err); } finally { setSaving(false); }
   };
 
   return (
     <div className="space-y-4">
-      <div>
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
         <h1 className="text-lg font-bold text-slate-800">Technician Requests</h1>
         <p className="text-xs text-slate-500 mt-0.5">Field service and repair requests from subscribers</p>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {kpis.map(s => (
-          <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
+          <motion.div key={s.label} variants={fadeUp} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
             <div className="flex items-center gap-2 mb-2"><div className={`w-2 h-2 rounded-full ${s.dot}`} /><p className="text-xs text-slate-500">{s.label}</p></div>
             <p className={`text-2xl font-bold ${s.color}`}>{loading ? "..." : s.value}</p>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.3 }}
+        className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
         <div className="flex flex-wrap items-center gap-3 mb-3">
           <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2 flex-1 max-w-xs">
             <Search size={14} className="text-slate-400" />
-            <input type="text" placeholder="Search issue, account, contact..." value={search}
-              onChange={e => setSearch(e.target.value)}
+            <input type="text" placeholder="Search issue, account, contact..." value={search} onChange={e => setSearch(e.target.value)}
               className="bg-transparent text-xs text-slate-600 placeholder-slate-400 outline-none w-full" />
           </div>
           <div className="flex gap-1.5 flex-wrap">
             {["All", ...STATUSES].map(s => (
-              <button key={s} onClick={() => setStatus(s)}
-                className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${
-                  statusFilter === s ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{s}</button>
+              <motion.button key={s} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setStatus(s)}
+                className={`text-xs px-2.5 py-1.5 rounded-xl font-medium transition-colors ${statusFilter === s ? "bg-red-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>{s}</motion.button>
             ))}
           </div>
           <span className="text-xs text-slate-400 ml-auto">{filtered.length} request{filtered.length !== 1 ? "s" : ""}</span>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50">
-                {["#","Issue","Account No.","Contact","Preferred Date","Technician","Status","Actions"].map(h => (
-                  <th key={h} className="text-left py-2.5 px-3 text-slate-500 font-semibold uppercase tracking-wide" style={{ fontSize: "10px" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
+            <thead><tr className="border-b border-slate-100 bg-slate-50">{["#","Issue","Account No.","Contact","Preferred Date","Technician","Status","Actions"].map(h => (<th key={h} className="text-left py-2.5 px-3 text-slate-500 font-semibold uppercase tracking-wide" style={{ fontSize: "10px" }}>{h}</th>))}</tr></thead>
             <tbody>
-              {loading ? (
-                <tr><td colSpan={8} className="py-10 text-center text-slate-400">Loading...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-10 text-center text-slate-400">No requests found.</td></tr>
-              ) : filtered.map(r => {
+              {loading ? <tr><td colSpan={8} className="py-10 text-center text-slate-400">Loading...</td></tr>
+              : filtered.length === 0 ? <tr><td colSpan={8} className="py-10 text-center text-slate-400">No requests found.</td></tr>
+              : filtered.map((r, i) => {
                 const s = statusCfg[r.status] || statusCfg["Pending"];
                 return (
-                  <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50 last:border-0">
+                  <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03, duration: 0.2 }}
+                    className="border-b border-slate-50 hover:bg-slate-50 last:border-0">
                     <td className="py-2 px-3 font-mono text-slate-400">{r.id}</td>
                     <td className="py-2 px-3 font-semibold text-slate-800 max-w-[160px] truncate">{r.issueDescription}</td>
                     <td className="py-2 px-3 font-mono text-slate-600">{r.accountNumber}</td>
@@ -132,21 +107,19 @@ export default function AdminTechnicianRequests() {
                     <td className="py-2 px-3 text-slate-500">{r.preferred_date || "—"}</td>
                     <td className="py-2 px-3 text-slate-500">{r.technician_name || <span className="text-slate-300">Unassigned</span>}</td>
                     <td className="py-2 px-3"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.badge}`}>{r.status}</span></td>
-                    <td className="py-2 px-3">
-                      <button onClick={() => openModal(r)}
-                        className="text-xs px-3 py-1 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold">Manage</button>
-                    </td>
-                  </tr>
+                    <td className="py-2 px-3"><button onClick={() => openModal(r)} className="text-xs px-3 py-1 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold">Manage</button></td>
+                  </motion.tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </div>
+      </motion.div>
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.18 }}
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-bold text-slate-800">Manage Request #{selected.id}</h2>
               <button onClick={() => setSelected(null)} className="p-1 rounded-xl hover:bg-slate-100 text-slate-400"><X size={16} /></button>
@@ -157,32 +130,21 @@ export default function AdminTechnicianRequests() {
                 <div className="flex items-center gap-2"><Phone size={12} className="text-slate-400" /><p className="text-xs text-slate-600">{selected.contactName} · {selected.contactPhone}</p></div>
                 {selected.preferred_date && <div className="flex items-center gap-2"><Calendar size={12} className="text-slate-400" /><p className="text-xs text-slate-600">{selected.preferred_date} {selected.preferred_time}</p></div>}
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Status</label>
-                <select value={newStatus} onChange={e => setNewStatus(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500">
-                  {STATUSES.map(s => <option key={s}>{s}</option>)}
-                </select>
+              <div><label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Status</label>
+                <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500">{STATUSES.map(s => <option key={s}>{s}</option>)}</select>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Assign Technician</label>
-                <input value={techName} onChange={e => setTechName(e.target.value)} placeholder="Enter technician name"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500" />
+              <div><label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Assign Technician</label>
+                <input value={techName} onChange={e => setTechName(e.target.value)} placeholder="Enter technician name" className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500" />
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Admin Note</label>
-                <textarea value={adminNote} onChange={e => setAdminNote(e.target.value)} rows={3} placeholder="Optional notes..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500 resize-none" />
+              <div><label className="block text-xs text-slate-500 font-medium mb-1" style={{ fontSize: "10px" }}>Admin Note</label>
+                <textarea value={adminNote} onChange={e => setAdminNote(e.target.value)} rows={3} placeholder="Optional notes..." className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-red-500 resize-none" />
               </div>
               <div className="flex gap-2">
-                <button onClick={handleSave} disabled={saving}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-2.5 rounded-xl font-semibold disabled:opacity-60">
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
+                <button onClick={handleSave} disabled={saving} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs py-2.5 rounded-xl font-semibold disabled:opacity-60">{saving ? "Saving..." : "Save Changes"}</button>
                 <button onClick={() => setSelected(null)} className="flex-1 border border-slate-200 text-xs py-2.5 rounded-xl text-slate-600 hover:bg-slate-50">Cancel</button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>
