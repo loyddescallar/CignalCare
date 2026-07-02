@@ -10,21 +10,26 @@ async function findByAccountName(accountName) {
 
 async function findById(id) {
   const [rows] = await pool.query(
-    "SELECT * FROM users WHERE id = ? LIMIT 1",
+    `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
+            u.phone, u.location, u.email, u.role, u.status, u.created_at,
+            MAX(pt.transaction_date) as lastLoadDate
+     FROM users u
+     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     WHERE u.id = ?
+     GROUP BY u.id
+     LIMIT 1`,
     [id]
   );
   return rows[0] || null;
 }
 
 async function checkDuplicate(accountNumber, ccaNumber, excludeId = null) {
-  let sql = "SELECT id FROM users WHERE (accountNumber = ? OR ccaNumber = ? )";
+  let sql = "SELECT id FROM users WHERE (accountNumber = ? OR ccaNumber = ?)";
   const params = [accountNumber, ccaNumber];
-
   if (excludeId) {
     sql += " AND id <> ?";
     params.push(excludeId);
   }
-
   sql += " LIMIT 1";
   const [rows] = await pool.query(sql, params);
   return rows[0] || null;
@@ -32,8 +37,8 @@ async function checkDuplicate(accountNumber, ccaNumber, excludeId = null) {
 
 async function createUser(user) {
   const sql = `
-    INSERT INTO users (accountName, accountNumber, ccaNumber, address, phone, role)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (accountName, accountNumber, ccaNumber, address, phone, location, role)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
   const [result] = await pool.query(sql, [
     user.accountName,
@@ -41,6 +46,7 @@ async function createUser(user) {
     user.ccaNumber,
     user.address,
     user.phone,
+    user.location || "Balayan",
     user.role || "user",
   ]);
   return result.insertId;
@@ -48,7 +54,14 @@ async function createUser(user) {
 
 async function findByAccountIdOrCca(accountId) {
   const [rows] = await pool.query(
-    "SELECT * FROM users WHERE accountNumber = ? OR ccaNumber = ? LIMIT 1",
+    `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
+            u.phone, u.location, u.role, u.status, u.created_at,
+            MAX(pt.transaction_date) as lastLoadDate
+     FROM users u
+     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     WHERE u.accountNumber = ? OR u.ccaNumber = ?
+     GROUP BY u.id
+     LIMIT 1`,
     [accountId, accountId]
   );
   return rows[0] || null;
@@ -56,17 +69,42 @@ async function findByAccountIdOrCca(accountId) {
 
 async function getAllUsers() {
   const [rows] = await pool.query(
-    `SELECT id, accountName, accountNumber, ccaNumber, address, phone, role, created_at
-     FROM users
-     ORDER BY created_at DESC, id DESC`
+    `SELECT u.id, u.accountName, u.accountNumber, u.ccaNumber, u.address,
+            u.phone, u.location, u.role, u.status, u.created_at,
+            MAX(pt.transaction_date) as lastLoadDate
+     FROM users u
+     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     WHERE u.role = 'user'
+     GROUP BY u.id
+     ORDER BY u.created_at DESC, u.id DESC`
   );
   return rows;
+}
+
+async function getCustomerStats() {
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const [rows] = await pool.query(
+    `SELECT
+       COUNT(*) as total,
+       SUM(CASE WHEN DATE_FORMAT(u.created_at, '%Y-%m') = ? THEN 1 ELSE 0 END) as thisMonth,
+       SUM(CASE WHEN MAX(pt.transaction_date) >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as activeCount,
+       SUM(CASE WHEN MAX(pt.transaction_date) >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+                 AND MAX(pt.transaction_date) < DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as atRiskCount,
+       SUM(CASE WHEN MAX(pt.transaction_date) IS NULL
+                 OR MAX(pt.transaction_date) < DATE_SUB(NOW(), INTERVAL 60 DAY) THEN 1 ELSE 0 END) as inactiveCount
+     FROM users u
+     LEFT JOIN prepaid_transactions pt ON pt.account_number = u.accountNumber AND pt.status = 'completed'
+     WHERE u.role = 'user'`,
+    [thisMonth]
+  );
+  return rows[0];
 }
 
 async function updateUser(id, data) {
   const sql = `
     UPDATE users
-    SET accountName = ?, accountNumber = ?, ccaNumber = ?, address = ?, phone = ?, role = ?
+    SET accountName = ?, accountNumber = ?, ccaNumber = ?, address = ?, phone = ?, location = ?, role = ?
     WHERE id = ?
   `;
   await pool.query(sql, [
@@ -75,6 +113,7 @@ async function updateUser(id, data) {
     data.ccaNumber,
     data.address,
     data.phone,
+    data.location || "Balayan",
     data.role || "user",
     id,
   ]);
@@ -91,6 +130,7 @@ module.exports = {
   createUser,
   findByAccountIdOrCca,
   getAllUsers,
+  getCustomerStats,
   updateUser,
   deleteUser,
 };

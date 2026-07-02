@@ -1,52 +1,35 @@
-// routes/customerRoutes.js
 const express = require("express");
 const router = express.Router();
-
 const {
   getCustomerByAccount,
+  getCustomerById,
+  getStats,
   listCustomers,
   createCustomerController,
   updateCustomerController,
   deleteCustomerController,
 } = require("../controllers/customerController");
-
 const { authRequired, requireRole } = require("../middleware/auth");
 
-// 🔐 Admin routes: list + create + edit + delete
-router.get(
-  "/",
-  authRequired,
-  requireRole("admin"),
-  listCustomers
-);
+// Stats endpoint (must be before /:accountId to avoid conflict)
+router.get("/stats", authRequired, requireRole("admin"), getStats);
 
-router.post(
-  "/",
-  authRequired,
-  requireRole("admin"),
-  createCustomerController
-);
+// List all customers
+router.get("/", authRequired, requireRole("admin"), listCustomers);
 
-router.put(
-  "/id/:id",
-  authRequired,
-  requireRole("admin"),
-  updateCustomerController
-);
+// Create customer
+router.post("/", authRequired, requireRole("admin"), createCustomerController);
 
-router.delete(
-  "/id/:id",
-  authRequired,
-  requireRole("admin"),
-  deleteCustomerController
-);
+// Get by numeric ID (for profile page)
+router.get("/id/:id", authRequired, getCustomerById);
 
-// 🔎 Lookup by accountNumber or ccaNumber (for any logged-in user)
-// Example: GET /api/customers/88773322
-router.get(
-  "/:accountId",
-  authRequired,
-  getCustomerByAccount
-);
+// Update by ID
+router.put("/id/:id", authRequired, requireRole("admin"), updateCustomerController);
+
+// Delete by ID
+router.delete("/id/:id", authRequired, requireRole("admin"), deleteCustomerController);
+
+// Lookup by accountNumber or ccaNumber
+router.get("/:accountId", authRequired, getCustomerByAccount);
 
 module.exports = router;
