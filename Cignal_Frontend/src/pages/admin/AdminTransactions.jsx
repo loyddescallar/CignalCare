@@ -2,6 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import { Search, Download } from "lucide-react";
 import loadAdminApi from "../../api/loadAdminApi";
 
+function formatDate(d) {
+  if (!d) return "—";
+  const date = new Date(d);
+  return date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
+}
+
 export default function AdminTransactions() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,13 +33,18 @@ export default function AdminTransactions() {
     );
   }, [history, search]);
 
-  const totalRevenue   = history.reduce((s, h) => s + Number(h.loadAmount || 0), 0);
-  const today          = new Date().toISOString().split("T")[0];
-  const todayRevenue   = history.filter(h => (h.created_at || "").startsWith(today)).reduce((s, h) => s + Number(h.loadAmount || 0), 0);
+  const today        = new Date().toISOString().split("T")[0];
+  const totalRevenue = history.reduce((s, h) => s + Number(h.loadAmount || 0), 0);
+  const todayRevenue = history
+    .filter(h => (h.created_at || "").startsWith(today) || (h.created_at || "").includes(today))
+    .reduce((s, h) => s + Number(h.loadAmount || 0), 0);
 
   const handleExport = () => {
-    const rows = [["ID","Account Number","Amount","Description","Status","Date"]];
-    history.forEach(h => rows.push([h.id, h.accountNumber, h.loadAmount, h.description || "", h.status, (h.created_at||"").split(" ")[0]]));
+    const rows = [["ID", "Account Number", "Amount", "Description", "Status", "Date"]];
+    history.forEach(h => rows.push([
+      h.id, h.accountNumber, h.loadAmount,
+      h.description || "", h.status, formatDate(h.created_at)
+    ]));
     const csv = rows.map(r => r.join(",")).join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
@@ -56,9 +67,9 @@ export default function AdminTransactions() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Transactions", value: loading ? "..." : history.length,                              color: "text-slate-800" },
-          { label: "Today's Revenue",    value: loading ? "..." : `₱${todayRevenue.toLocaleString()}`,          color: "text-blue-600" },
-          { label: "Total Revenue",      value: loading ? "..." : `₱${totalRevenue.toLocaleString()}`,          color: "text-green-600" },
+          { label: "Total Transactions", value: loading ? "..." : history.length,                                           color: "text-slate-800" },
+          { label: "Today's Revenue",    value: loading ? "..." : `₱${todayRevenue.toLocaleString()}`,                      color: "text-blue-600" },
+          { label: "Total Revenue",      value: loading ? "..." : `₱${totalRevenue.toLocaleString()}`,                      color: "text-green-600" },
           { label: "Avg. Load Amount",   value: loading ? "..." : history.length ? `₱${Math.round(totalRevenue / history.length).toLocaleString()}` : "₱0", color: "text-red-600" },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl p-4 shadow-sm border border-slate-200">
@@ -83,7 +94,7 @@ export default function AdminTransactions() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
-                {["#","Account Number","Amount","Description","Status","Date"].map(h => (
+                {["#", "Account Number", "Amount", "Description", "Status", "Date"].map(h => (
                   <th key={h} className="text-left py-2.5 px-3 text-slate-500 font-semibold uppercase tracking-wide" style={{ fontSize: "10px" }}>{h}</th>
                 ))}
               </tr>
@@ -101,10 +112,12 @@ export default function AdminTransactions() {
                   <td className="py-2 px-3 text-slate-600">{h.description || "Prepaid Load"}</td>
                   <td className="py-2 px-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                      h.status === "completed" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                      h.status === "completed" ? "bg-green-100 text-green-700" :
+                      h.status === "pending"   ? "bg-amber-100 text-amber-700" :
+                                                  "bg-slate-100 text-slate-600"
                     }`}>{h.status || "completed"}</span>
                   </td>
-                  <td className="py-2 px-3 text-slate-400">{(h.created_at || "").split(" ")[0]}</td>
+                  <td className="py-2 px-3 text-slate-400">{formatDate(h.created_at)}</td>
                 </tr>
               ))}
             </tbody>
