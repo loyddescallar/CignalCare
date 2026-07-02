@@ -1,22 +1,23 @@
 const pool = require("../config/db");
 
-async function createRequest(reqData) {
-  const sql = `INSERT INTO technician_requests
-    (user_id, accountNumber, contactName, contactPhone, issueDescription, status)
-    VALUES (?, ?, ?, ?, ?, 'Pending')`;
+async function createRequest(data) {
+  const sql = `
+    INSERT INTO technician_requests (user_id, accountNumber, contactName, contactPhone, issueDescription)
+    VALUES (?, ?, ?, ?, ?)
+  `;
   const [result] = await pool.query(sql, [
-    reqData.user_id,
-    reqData.accountNumber,
-    reqData.contactName,
-    reqData.contactPhone,
-    reqData.issueDescription
+    data.user_id,
+    data.accountNumber,
+    data.contactName,
+    data.contactPhone,
+    data.issueDescription
   ]);
   return result.insertId;
 }
 
 async function getRequestsByUser(userId) {
   const [rows] = await pool.query(
-    "SELECT * FROM technician_requests WHERE user_id = ? ORDER BY created_at DESC",
+    `SELECT * FROM technician_requests WHERE user_id = ? ORDER BY created_at DESC`,
     [userId]
   );
   return rows;
@@ -24,19 +25,19 @@ async function getRequestsByUser(userId) {
 
 async function getAllRequests() {
   const [rows] = await pool.query(
-    `SELECT tr.*, u.accountName
-     FROM technician_requests tr
-     LEFT JOIN users u ON u.id = tr.user_id
-     ORDER BY tr.created_at DESC`
+    `SELECT * FROM technician_requests ORDER BY created_at DESC`
   );
   return rows;
 }
 
-async function updateRequestStatus(id, status) {
-  await pool.query(
-    "UPDATE technician_requests SET status = ?, updated_at = NOW() WHERE id = ?",
-    [status, id]
-  );
+async function updateRequestStatus(id, status, technicianName = null, adminNote = null) {
+  let sql = "UPDATE technician_requests SET status = ?";
+  const params = [status];
+  if (technicianName !== null) { sql += ", technician_name = ?"; params.push(technicianName); }
+  if (adminNote !== null) { sql += ", admin_note = ?"; params.push(adminNote); }
+  sql += ", updated_at = NOW() WHERE id = ?";
+  params.push(id);
+  await pool.query(sql, params);
 }
 
 module.exports = {

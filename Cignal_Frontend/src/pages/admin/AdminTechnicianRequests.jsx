@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Search, ChevronDown, X, Wrench, Calendar, Phone, User } from "lucide-react";
+import { Search, X, Wrench, Calendar, Phone } from "lucide-react";
 import axiosClient from "../../api/axiosClient";
 
 const STATUSES = ["Pending", "Scheduled", "Completed", "Cancelled"];
@@ -12,22 +12,22 @@ const statusCfg = {
 };
 
 export default function AdminTechnicianRequests() {
-  const [requests, setRequests]     = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [search, setSearch]         = useState("");
-  const [statusFilter, setStatus]   = useState("All");
-  const [selected, setSelected]     = useState(null);
-  const [techName, setTechName]     = useState("");
-  const [adminNote, setAdminNote]   = useState("");
-  const [newStatus, setNewStatus]   = useState("");
-  const [saving, setSaving]         = useState(false);
+  const [requests, setRequests]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState("");
+  const [statusFilter, setStatus] = useState("All");
+  const [selected, setSelected]   = useState(null);
+  const [techName, setTechName]   = useState("");
+  const [adminNote, setAdminNote] = useState("");
+  const [newStatus, setNewStatus] = useState("");
+  const [saving, setSaving]       = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await axiosClient.get("/technicians");
-      setRequests(res.data?.requests || res.data?.technicians || []);
-    } catch (err) { console.error(err); }
+      const res = await axiosClient.get("/technicians/requests/admin");
+      setRequests(res.data?.requests || []);
+    } catch (err) { console.error("Tech requests load error", err); }
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
@@ -44,7 +44,7 @@ export default function AdminTechnicianRequests() {
   }, [requests, search, statusFilter]);
 
   const kpis = [
-    { label: "Total",     value: requests.length,                                  dot: "bg-slate-400",  color: "text-slate-800" },
+    { label: "Total",     value: requests.length,                                    dot: "bg-slate-400",  color: "text-slate-800" },
     { label: "Pending",   value: requests.filter(r => r.status === "Pending").length,   dot: "bg-amber-400", color: "text-amber-600" },
     { label: "Scheduled", value: requests.filter(r => r.status === "Scheduled").length, dot: "bg-blue-500",  color: "text-blue-600" },
     { label: "Completed", value: requests.filter(r => r.status === "Completed").length, dot: "bg-green-500", color: "text-green-600" },
@@ -61,15 +61,15 @@ export default function AdminTechnicianRequests() {
     if (!selected) return;
     setSaving(true);
     try {
-      await axiosClient.patch(`/technicians/${selected.id}/status`, {
+      await axiosClient.patch(`/technicians/requests/admin/${selected.id}`, {
         status: newStatus,
-        technician_name: techName,
-        admin_note: adminNote,
+        technician_name: techName || null,
+        admin_note: adminNote || null,
       });
       setRequests(prev => prev.map(r => r.id === selected.id
         ? { ...r, status: newStatus, technician_name: techName, admin_note: adminNote } : r));
       setSelected(null);
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error("Tech update error", err); }
     finally { setSaving(false); }
   };
 
@@ -131,9 +131,7 @@ export default function AdminTechnicianRequests() {
                     <td className="py-2 px-3 text-slate-600">{r.contactName}</td>
                     <td className="py-2 px-3 text-slate-500">{r.preferred_date || "—"}</td>
                     <td className="py-2 px-3 text-slate-500">{r.technician_name || <span className="text-slate-300">Unassigned</span>}</td>
-                    <td className="py-2 px-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.badge}`}>{r.status}</span>
-                    </td>
+                    <td className="py-2 px-3"><span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${s.badge}`}>{r.status}</span></td>
                     <td className="py-2 px-3">
                       <button onClick={() => openModal(r)}
                         className="text-xs px-3 py-1 bg-red-600 text-white rounded-xl hover:bg-red-700 font-semibold">Manage</button>
@@ -154,8 +152,8 @@ export default function AdminTechnicianRequests() {
               <button onClick={() => setSelected(null)} className="p-1 rounded-xl hover:bg-slate-100 text-slate-400"><X size={16} /></button>
             </div>
             <div className="p-5 space-y-3">
-              <div className="bg-slate-50 rounded-xl p-3 space-y-2">
-                <div className="flex items-start gap-2"><Wrench size={12} className="text-red-600 mt-0.5" /><p className="text-xs text-slate-700">{selected.issueDescription}</p></div>
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-start gap-2"><Wrench size={12} className="text-red-600 mt-0.5 flex-shrink-0" /><p className="text-xs text-slate-700">{selected.issueDescription}</p></div>
                 <div className="flex items-center gap-2"><Phone size={12} className="text-slate-400" /><p className="text-xs text-slate-600">{selected.contactName} · {selected.contactPhone}</p></div>
                 {selected.preferred_date && <div className="flex items-center gap-2"><Calendar size={12} className="text-slate-400" /><p className="text-xs text-slate-600">{selected.preferred_date} {selected.preferred_time}</p></div>}
               </div>
