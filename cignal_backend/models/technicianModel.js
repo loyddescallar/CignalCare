@@ -25,7 +25,10 @@ async function getRequestsByUser(userId) {
 
 async function getAllRequests() {
   const [rows] = await pool.query(
-    `SELECT * FROM technician_requests ORDER BY created_at DESC`
+    `SELECT tr.*, u.location
+     FROM technician_requests tr
+     LEFT JOIN users u ON u.accountNumber = tr.accountNumber
+     ORDER BY tr.created_at DESC`
   );
   return rows;
 }

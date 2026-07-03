@@ -1,14 +1,14 @@
 const pool = require("../config/db");
 
 async function addLoadHistory(entry) {
-  const sql = `INSERT INTO load_history
-    (user_id, accountNumber, loadAmount, description)
-    VALUES (?, ?, ?, ?)`;
+  const sql = `INSERT INTO load_history (user_id, accountNumber, loadAmount, description, status)
+    VALUES (?, ?, ?, ?, ?)`;
   const [result] = await pool.query(sql, [
     entry.user_id,
     entry.accountNumber,
     entry.loadAmount,
-    entry.description || null
+    entry.description || null,
+    entry.status || "completed"
   ]);
   return result.insertId;
 }
@@ -31,8 +31,27 @@ async function getAllLoadHistory() {
   return rows;
 }
 
+async function getAllPrepaidTransactions() {
+  const [rows] = await pool.query(
+    `SELECT pt.*, pp.plan_name, pp.validity_days
+     FROM prepaid_transactions pt
+     LEFT JOIN prepaid_plans pp ON pp.id = pt.plan_id
+     ORDER BY pt.transaction_date DESC`
+  );
+  return rows;
+}
+
+async function updateLoadStatus(id, status) {
+  await pool.query(
+    "UPDATE load_history SET status = ? WHERE id = ?",
+    [status, id]
+  );
+}
+
 module.exports = {
   addLoadHistory,
   getLoadHistoryByUser,
-  getAllLoadHistory
+  getAllLoadHistory,
+  getAllPrepaidTransactions,
+  updateLoadStatus
 };
